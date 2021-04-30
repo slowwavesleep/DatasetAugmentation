@@ -1,14 +1,9 @@
 import argparse
+import json
 from typing import List
 
 from datasets import load_dataset
 from textattack.augmentation import EmbeddingAugmenter
-
-# parser = argparse.ArgumentParser(description="Augment specified HuggingFace dataset")
-# parser.add_argument("-p", "--path", help="Dataset path", type=str)
-# parser.add_argument("-n", "--name", help="Dataset name", type=str)
-# parser.add_argument("-n", "--name", help="Augment only short examples", type=bool)
-# args = parser.parse_args()
 
 SPLIT = "train"
 
@@ -38,7 +33,7 @@ def augment_rte(only_short: bool = False) -> List[dict]:
     dataset = list(dataset)
     id_list, sent1_list, sent2_list, label_list = convert_rte(dataset)
 
-    last_idx = max(id_list)
+    last_idx = max(id_list) + 1
 
     if only_short:
         sent1_aug = sent1_list
@@ -54,5 +49,22 @@ def augment_rte(only_short: bool = False) -> List[dict]:
                                   "label": label})
     dataset.extend(augmented_dataset)
     return dataset
-#
-# print(augment_rte(only_short=True))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Augment specified HuggingFace dataset")
+    parser.add_argument("-p", "--path", help="Dataset path", type=str, default="glue")
+    parser.add_argument("-n", "--name", help="Dataset name", type=str, default="rte")
+    parser.add_argument("--only_short", help="Augment only short examples", type=bool, default=True)
+    parser.add_argument("--write_path", help="Path to write the result", type=str, default="augmented.jsonl")
+    args = parser.parse_args()
+
+    if args.path == "glue" and args.name == "rte":
+        augmented = augment_rte(only_short=args.only_short)
+
+    else:
+        raise NotImplementedError
+
+    with open(args.write_path, "w") as file:
+        for example in augmented:
+            file.write(json.dumps(example) + "\n")
