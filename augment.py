@@ -21,6 +21,19 @@ def convert_rte(dataset: List[dict]):
     return id_list, sent1_list, sent2_list, label_list
 
 
+def convert_boolq(dataset: List[dict]):
+    id_list = []
+    question_list = []
+    passage_list = []
+    label_list = []
+    for example_dict in dataset:
+        id_list.append(example_dict["idx"])
+        question_list.append(example_dict["question"])
+        passage_list.append(example_dict["passage"])
+        label_list.append(example_dict["label"])
+    return id_list, question_list, passage_list, label_list
+
+
 def augment_examples(sentences: List[str], num_transformations: int = 1):
     emb_augmenter = EmbeddingAugmenter(transformations_per_example=num_transformations)
     augmented = emb_augmenter.augment_many(sentences, show_progress=True)
@@ -51,6 +64,28 @@ def augment_rte(only_short: bool = False) -> List[dict]:
     return dataset
 
 
+def augment_boolq(only_short: bool = False) -> List[dict]:
+    dataset = load_dataset(path="super_glue", name="boolq", split=SPLIT)
+    dataset = list(dataset)
+    id_list, question_list, passage_list, label_list = convert_boolq(dataset)
+
+    last_idx = max(id_list) + 1
+
+    if only_short:
+        passage_aug = passage_list
+    else:
+        passage_aug = augment_examples(passage_list)
+    question_aug = augment_examples(question_list)
+    augmented_dataset = []
+    for idx, question, passage, label in zip(id_list, question_aug, passage_aug, label_list):
+        augmented_dataset.append({"idx": idx + last_idx,
+                                  "question": question,
+                                  "passage": passage,
+                                  "label": label})
+    dataset.extend(augmented_dataset)
+    return dataset
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Augment specified HuggingFace dataset")
     parser.add_argument("-p", "--path", help="Dataset path", type=str, default="glue")
@@ -60,11 +95,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.path == "glue" and args.name == "rte":
-        augmented = augment_rte(only_short=args.only_short)
+        augmented_data = augment_rte(only_short=args.only_short)
+
+    elif args.path == "super_glue" and args.name == "boolq":
+        augmented_data = augment_boolq(only_short=args.only_short)
 
     else:
         raise NotImplementedError
 
     with open(args.write_path, "w") as file:
-        for example in augmented:
+        for example in augmented_data:
             file.write(json.dumps(example) + "\n")
